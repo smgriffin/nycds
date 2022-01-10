@@ -41,4 +41,8 @@ zipCount <- graffiti %>%
   group_by(zipcode = zip_code) %>%
   summarise(count = n())
 
+# Which zipcodes have the most graffiti incidents?
 zipCount <- zipCount %>% arrange(desc(count))
+
+# How well are the boroughs resolving the problem?
+graffitiStatus <- graffiti %>% group_by(borough) %>% count(status)
