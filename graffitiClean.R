@@ -1,14 +1,15 @@
 # import libraries
 
-library("RSocrata")
-library("dplyr")
-library("lubridate")
-library("tibbletime")
-library("rusps")
-library("XML")
+library(RSocrata)
+library(tidyr)
+library(dplyr)
+library(lubridate)
+library(tibbletime)
+library(rusps)
+library(XML)
 
 # usps username
-username <- "XXXXX"
+username <- ""
 
 # read data from Socrata API and select columns
 url <- "https://data.cityofnewyork.us/resource/gpwd-npar.json?$SELECT=incident_address AS address, borough, created_date as date, status, resolution_action AS resolution, closed_date, zip_code, latitude, longitude"
@@ -19,13 +20,17 @@ graffiti$date <- as_date(graffiti[,"date"], tz = NULL)
 graffiti$closed_date <- as_date(graffiti[, "closed_date"], tz = NULL)
 
 # fix zip_code using rusps and drop unresolvable addresses
-graffiti$zip_code <- validate_address_usps(street = graffiti$address,
-                                         city = graffiti$borough,
-                                         state = 'NY',
-                                         username = username)
+# graffiti$zip_code <- validate_address_usps(street = graffiti$address,
+#                                          city = graffiti$borough,
+#                                          state = 'NY',
+#                                          username = username)
 graffiti <- graffiti %>% drop_na(zip_code)
 
 # Finding which boroughs have the most incidents of graffiti
+
+# Run this if any boroughs are unspecified
+graffiti[!grepl('UNSPECIFIED', graffiti$borough),]
+
 boroughCount <- graffiti %>% 
   group_by(borough) %>%
   summarise(count = n())
@@ -33,8 +38,14 @@ boroughCount <- graffiti %>%
 
 # Finding which months have the highest incidents of graffiti
 monthlyCount <- graffiti %>%
-  group_by(Month = month(date)) %>%
+  group_by(month = month(date)) %>%
   summarise(count = n())
+
+monthnames <- c("January", "February", "March", "April",
+                "May", "June", "July", "August",
+                "September", "October", "November", "December")
+
+monthlyCount$month <- monthnames
 
 # Finding which zip codes have the highest incidents of graffiti
 zipCount <- graffiti %>%
@@ -46,3 +57,8 @@ zipCount <- zipCount %>% arrange(desc(count))
 
 # How well are the boroughs resolving the problem?
 graffitiStatus <- graffiti %>% group_by(borough) %>% count(status)
+graffitiPivot <- graffitiStatus %>% 
+                  pivot_wider(id_cols = borough, 
+                  names_from = status, 
+                  values_from = n)
+replace_na(graffitiPivot, Closed = 0)
