@@ -3,10 +3,14 @@
 library(RSocrata)
 library(tidyr)
 library(dplyr)
+library(ggplot2)
+library(tigris)
+library(sf)
 library(lubridate)
-library(tibbletime)
-library(rusps)
-library(XML)
+library(mapsf)
+library(rvest)
+#library(rusps)
+#library(XML)
 
 # usps username
 username <- ""
@@ -26,12 +30,10 @@ graffiti$closed_date <- as_date(graffiti[, "closed_date"], tz = NULL)
 #                                          username = username)
 graffiti <- graffiti %>% drop_na(zip_code)
 
-# Finding which boroughs have the most incidents of graffiti
-
 # Run this if any boroughs are unspecified
-graffiti[!grepl('UNSPECIFIED', graffiti$borough),]
+graffiti <- graffiti[!grepl('UNSPECIFIED', graffiti$borough),]
 
-boroughCount <- graffiti %>% 
+graffiti %>% 
   group_by(borough) %>%
   summarise(count = n())
 
@@ -48,17 +50,61 @@ monthnames <- c("January", "February", "March", "April",
 monthlyCount$month <- monthnames
 
 # Finding which zip codes have the highest incidents of graffiti
+
+# Get all nyc zipcodes from worldpopulationreview.com
+html <- read_html('https://worldpopulationreview.com/zips/new-york')
+
+ziplist <- html %>% 
+          html_element('table') %>%
+          html_table()  %>%
+          select(zipcode = 'Zip Code')
+
+ziplist$zipcode <- as.character(ziplist$zipcode)
+
 zipCount <- graffiti %>%
   group_by(zipcode = zip_code) %>%
-  summarise(count = n())
+  summarise(count = n()) %>%
+           
+zipCount <- full_join(ziplist, zipCount, by = 'zipcode') 
 
-# Which zipcodes have the most graffiti incidents?
-zipCount <- zipCount %>% arrange(desc(count))
+zipCount <- zipCount %>%
+            replace_na(list(count = 0)) %>%
+            arrange(desc(count))
+  
+zipTop <- zipCount %>% head(20)
+
+# download shapfile (for map)
+options(tigris_use_cache = TRUE)
+geo <- st_as_sf(zctas(cb = TRUE, starts_with = zipCount$zipcode))
+
+# shape of USA states
+states <- st_as_sf(states(cb=TRUE))
+states = st_transform(states, st_crs(geo))
+
+sf.zipCount = merge(geo, zipCount)
+
+# Map Plot 
+#mf_map(x = sf.zipCount, 
+#       var = "count",
+#       type = "choro",
+#       pal = "Burg",
+#       breaks = "quantile",
+#       border = "white")
+       
+
 
 # How well are the boroughs resolving the problem?
 graffitiStatus <- graffiti %>% group_by(borough) %>% count(status)
 graffitiPivot <- graffitiStatus %>% 
                   pivot_wider(id_cols = borough, 
                   names_from = status, 
-                  values_from = n)
-replace_na(graffitiPivot, Closed = 0)
+                  values_from = n) %>%
+                  replace_na(list(Closed = 0))
+
+# Add total and percent columns
+graffitiPivot <- graffitiPivot %>% mutate(total = sum(Closed, Open), 
+                                          percent = (Closed/total) * 100)
+
+# Some graphs
+
+
