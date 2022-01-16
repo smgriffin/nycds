@@ -52,7 +52,7 @@ monthlyCount$month <- monthnames
 # Finding which zip codes have the highest incidents of graffiti
 
 # Get all nyc zipcodes from worldpopulationreview.com
-html <- read_html('https://worldpopulationreview.com/zips/new-york')
+#html <- read_html('https://worldpopulationreview.com/zips/new-york')
 
 ziplist <- html %>% 
           html_element('table') %>%
@@ -63,7 +63,7 @@ ziplist$zipcode <- as.character(ziplist$zipcode)
 
 zipCount <- graffiti %>%
   group_by(zipcode = zip_code) %>%
-  summarise(count = n()) %>%
+  summarise(count = n())
            
 zipCount <- full_join(ziplist, zipCount, by = 'zipcode') 
 
@@ -77,19 +77,16 @@ zipTop <- zipCount %>% head(20)
 options(tigris_use_cache = TRUE)
 geo <- st_as_sf(zctas(cb = TRUE, starts_with = zipCount$zipcode))
 
-# shape of USA states
-states <- st_as_sf(states(cb=TRUE))
-states = st_transform(states, st_crs(geo))
+zipCount <- merge(geo, zipCount, by.x="ZCTA5CE10", by.y="zipcode")
 
-sf.zipCount = merge(geo, zipCount)
 
 # Map Plot 
-#mf_map(x = sf.zipCount, 
-#       var = "count",
-#       type = "choro",
-#       pal = "Burg",
-#       breaks = "quantile",
-#       border = "white")
+mf_map(x = zipCount, 
+       var = "count",
+       type = "choro",
+       pal = "Burg",
+       breaks = "quantile",
+       border = "white")
        
 
 
