@@ -52,14 +52,23 @@ monthlyCount$month <- monthnames
 # Finding which zip codes have the highest incidents of graffiti
 
 # Get all nyc zipcodes from worldpopulationreview.com
+
 #html <- read_html('https://worldpopulationreview.com/zips/new-york')
+
+html <- read_html('https://www.nycbynatives.com/nyc_info/new_york_city_zip_codes.php')
+
 
 ziplist <- html %>% 
           html_element('table') %>%
-          html_table()  %>%
-          select(zipcode = 'Zip Code')
+          html_table() %>%
+          select('X1', 'X4')
 
-ziplist$zipcode <- as.character(ziplist$zipcode)
+ziplist <- ziplist %>%
+           transform(X1 = as.character(X1), X4 = as.character(X4)) %>%
+           gather(value = zipcode)
+           
+ziplist <- data.frame(ziplist[,-1])
+ziplist <- ziplist %>% rename(zipcode = 1)
 
 zipCount <- graffiti %>%
   group_by(zipcode = zip_code) %>%
@@ -76,17 +85,26 @@ zipTop <- zipCount %>% head(20)
 # download shapfile (for map)
 options(tigris_use_cache = TRUE)
 geo <- st_as_sf(zctas(cb = TRUE, starts_with = zipCount$zipcode))
+sf_use_s2(FALSE)
 
 zipCount <- merge(geo, zipCount, by.x="ZCTA5CE10", by.y="zipcode")
 
 
-# Map Plot 
+# Map Plot
 mf_map(x = zipCount, 
        var = "count",
        type = "choro",
        pal = "Burg",
        breaks = "quantile",
-       border = "white")
+       border = "white",
+       leg_title = "Reported Incidents",
+       leg_val_rnd = 0,
+       add = TRUE)
+
+mf_title("Graffiti Reports in NYC since 1/30/21")
+mf_credits("NYC Open Data / nycbynatives.com")
+
+
        
 
 
